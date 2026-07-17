@@ -1,0 +1,22 @@
+@import "tailwindcss";
+
+.cm-editor   {
+  height: 100%;
+}
+
+.cm-scroller::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+.cm-scroller::-webkit-scrollbar-track {
+  background: #0b101a;
+}
+
+.cm-scroller::-webkit-scrollbar-thumb {
+  background: #555;
+}
+
+.cm-scroller::-webkit-scrollbar-thumb:hover {
+  background: #777;
+}
