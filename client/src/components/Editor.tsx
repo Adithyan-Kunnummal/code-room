@@ -13,6 +13,8 @@ import {useState, useRef, useEffect} from 'react'
 import {useParams} from 'react-router-dom'
 import axios from 'axios'
 
+import {UserAuth} from '../context/AuthContext'
+
 export default function Editor() {
     const editorRef = useRef<HTMLDivElement>(null)
     const editorView = useRef<EditorView | null>(null)
@@ -22,6 +24,10 @@ export default function Editor() {
     const [isRunning, setIsRunning] = useState(false)
     const [output, setOutput] = useState('')
     const [users, setUsers] = useState<string[]>([])
+
+    const { session, user, handleLogin, handleLogout, loading } = UserAuth()
+
+    console.log(user)
 
     const usercolors = [
     { color: '#30bced', light: '#30bced33' },
@@ -46,7 +52,7 @@ export default function Editor() {
         const undoManager = new Y.UndoManager(ytext)
 
         provider.awareness.setLocalStateField('user', {
-        name: 'Anonymous ' + Math.floor(Math.random() * 100),
+        name: user?.user_metadata.name,
         color: userColor.color,
         colorLight: userColor.light
     })
@@ -111,24 +117,218 @@ export default function Editor() {
     }
 
     return (
-    <div>
-        <button 
-        disabled={isRunning}
-        onClick={handleExecute}
-        className="w-20 h-8 text-white text-sm bg-cyan-950 rounded-sm m-2">
-        {isRunning? "Running..." : "Run"}
-        </button>
-        <div className="flex">
-        <div className="flex items-center flex-col">
-            <span className="w-12 text-white text-center text-sm">Editor</span>
-            <div className=" h-[80vh] w-[50vw] bg-[#0c121d] overflow-auto" ref={editorRef}></div>
+    <div className="min-h-screen bg-[#40513B] text-white flex flex-col">
+
+    <header className="h-16 px-6 border-b border-[#40513B] bg-[#30312F] flex items-center justify-between">
+
+        <div>
+            <h1 className="text-xl font-bold">
+                CodeRoom
+            </h1>
+
+            <p className="text-sm text-[#8A9B8C]">
+                Room ID: {roomId}
+            </p>
         </div>
-        <div className="flex items-center flex-col">
-            <span className="text-white text-center text-sm">Output</span>
-            <div className="h-[80vh] w-[50vw] font-serif text-white text-xs bg-[#0c121d] overflow-auto p-1">{output}</div>
+
+        <div className="flex items-center gap-4">
+
+            <div className="flex gap-2">
+                <div className = "text-right">
+                    <p className="text-sm text-[#8A9B8C]">
+                        Signed in as
+                    </p>
+
+                    <p className="font-semibold">
+                        {user?.user_metadata.name}
+                    </p>
+                </div>
+                <div>
+                    {user?.is_anonymous ? <button
+                        onClick={handleLogin}
+                        className="
+                            bg-white
+                            text-[#30312F]
+                            px-4
+                            py-2
+                            rounded-lg
+                            font-medium
+                            hover:opacity-90
+                            transition
+                        "
+                    >
+                        Signin with Google
+                    </button> 
+                    : 
+                    <button
+                        onClick={handleLogout}
+                        className="
+                            bg-white
+                            text-[#30312F]
+                            px-4
+                            py-2
+                            rounded-lg
+                            font-medium
+                            hover:opacity-90
+                            transition
+                        "
+                    >
+                        Signout
+                    </button>}
+                </div>
+            </div>
+
+            <button
+                onClick={handleExecute}
+                disabled={isRunning}
+                className="
+                    bg-[#40513B]
+                    px-5
+                    py-2
+                    rounded-lg
+                    hover:bg-[#4f6348]
+                    disabled:opacity-50
+                "
+            >
+                {isRunning ? "Running..." : "Run"}
+            </button>
+
         </div>
+
+    </header>
+
+    <main className="flex flex-1 overflow-hidden">
+
+        <div className="
+            w-64
+            border-r
+            border-[#40513B]
+            bg-[#30312F]
+            flex
+            flex-col
+        ">
+
+            <div className="p-2 border-b border-[#40513B]">
+
+                <h2 className="font-semibold">
+                    Files
+                </h2>
+
+            </div>
+
+            <div className="flex-1 overflow-auto p-2">
+
+                <button className="w-full text-left p-3 rounded-lg hover:bg-[#40513B]">
+                    main.js
+                </button>
+
+            </div>
+
         </div>
-        <div className="text-white">{currUsersElements}</div>
-    </div>
+
+
+        <section className="flex-1 flex flex-col">
+
+            <div className="
+                h-10
+                px-4
+                border-b
+                border-[#40513B]
+                flex
+                items-center
+                bg-[#30312F]
+            ">
+
+                <span className="text-[#8A9B8C]">
+                    main.js
+                </span>
+
+            </div>
+
+            <div
+                ref={editorRef}
+                className="
+                    flex-1
+                    overflow-auto
+                "
+            />
+
+        </section>
+
+
+        <div className="
+            w-[350px]
+            border-l
+            border-[#40513B]
+            bg-[#30312F]
+            flex
+            flex-col
+        ">
+
+            <div className="
+                h-10
+                border-b
+                border-[#40513B]
+                flex
+                items-center
+                px-4
+            ">
+                Output
+            </div>
+
+            <div
+                className="
+                    flex-1
+                    overflow-auto
+                    p-4
+                    text-sm
+                    font-mono
+                    whitespace-pre-wrap
+                "
+            >
+                {output}
+            </div>
+
+        </div>
+
+    </main>
+
+    <footer className="
+        h-14
+        border-t
+        border-[#40513B]
+        bg-[#30312F]
+        px-6
+        flex
+        items-center
+        justify-between
+    ">
+
+        <div className="flex gap-2 flex-wrap">
+
+            {users.map((u) => (
+                <span
+                    key={u}
+                    className="
+                        px-3
+                        py-1
+                        rounded-full
+                        bg-[#40513B]
+                        text-sm
+                    "
+                >
+                    {u}
+                </span>
+            ))}
+
+        </div>
+
+        <span className="text-[#8A9B8C] text-sm">
+            {users.length} online
+        </span>
+
+    </footer>
+
+</div>
     )
 }

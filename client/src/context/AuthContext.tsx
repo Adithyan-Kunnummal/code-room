@@ -3,6 +3,8 @@ import type { ReactNode } from 'react'
 import type { Session, User  } from '@supabase/supabase-js'
 import {supabase} from '../lib/supabase'
 
+import getAnonUsername from '../utils/anonUsername'
+
 type AuthContextType = {
     session: Session | null;
     user: User | null;
@@ -20,7 +22,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined)
 export const AuthContextProvider = ({ children }: AuthContextProviderProps) => {
     const [session, setSession] = useState<Session | null>(null)
     const [loading, setLoading] = useState(false)
-
+    
     // Check if session already exists on first load
     useEffect(() => {
         const checkSession = async () => {
@@ -28,15 +30,31 @@ export const AuthContextProvider = ({ children }: AuthContextProviderProps) => {
 
             if(session) {
                 setSession(session)
+
+                if(session?.user.is_anonymous && !session?.user.user_metadata.name) {
+                    await supabase.auth.updateUser({
+                        data: {
+                            name: getAnonUsername()
+                        }
+                    })
+                }
             }
             else {
-                const { data, error } = await supabase.auth.signInAnonymously();
-                
+                const { data, error } = await supabase.auth.signInAnonymously()
+
                 if(error) {
                     console.log("Anonymous login failed: ", error.message)
                     return
                 }
-                setSession(session)
+
+                const result = await supabase.auth.updateUser({
+                    data: {
+                        name: getAnonUsername()
+                    }
+                })
+                console.log(result)
+                
+                setSession(data.session)
             }
         }
 
@@ -57,6 +75,9 @@ export const AuthContextProvider = ({ children }: AuthContextProviderProps) => {
 
         const { error } = await supabase.auth.signInWithOAuth({
             provider: "google",
+            options: {
+            redirectTo: window.location.href,
+        },
         });
 
         if (error) {
@@ -67,8 +88,28 @@ export const AuthContextProvider = ({ children }: AuthContextProviderProps) => {
     };
 
     const handleLogout = async () => {
-        await supabase.auth.signOut()
-        setSession(null);
+        setLoading(true)
+        const { error } = await supabase.auth.signOut()
+        
+        if(error) {
+            console.log(error)
+            return
+        }
+
+        const { error: anonSiginerror } = await supabase.auth.signInAnonymously()
+
+        if(anonSiginerror) {
+            console.log("Anonymous login failed: ", anonSiginerror.message)
+            return
+        }
+
+
+        await supabase.auth.updateUser({
+            data: {
+                name: getAnonUsername()
+            }
+        })
+        setLoading(false)
     }
 
     return (
