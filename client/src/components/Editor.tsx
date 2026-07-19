@@ -21,6 +21,7 @@ export default function Editor() {
 
     const [isRunning, setIsRunning] = useState(false)
     const [output, setOutput] = useState('')
+    const [users, setUsers] = useState<string[]>([])
 
     const usercolors = [
     { color: '#30bced', light: '#30bced33' },
@@ -50,6 +51,7 @@ export default function Editor() {
         colorLight: userColor.light
     })
 
+
     const state = EditorState.create({
       doc: ytext.toString(),
       extensions: [
@@ -61,15 +63,26 @@ export default function Editor() {
     })
 
     const view = new EditorView({ state, parent: editorRef.current})
-
     editorView.current = view
+
+    function updateUsers() {
+        const currUsers = Array.from(provider.awareness.getStates().values())
+        .filter((state) => state.user)
+        .map(state => state.user.name)
+        setUsers(currUsers)
+    }
+
+    updateUsers()
+    provider.awareness.on('change', () => updateUsers())
 
     return () => {
       view.destroy()
       provider.destroy();
       ydoc.destroy();
     };
-    }, [])
+    }, [roomId])
+
+    const currUsersElements = users.map((user) => (<li key = {user}>{user}</li>))
 
     async function handleExecute() {
         const data = {
@@ -111,10 +124,11 @@ export default function Editor() {
             <div className=" h-[80vh] w-[50vw] bg-[#0c121d] overflow-auto" ref={editorRef}></div>
         </div>
         <div className="flex items-center flex-col">
-            <span className="text-white text-center text-sm">Console</span>
+            <span className="text-white text-center text-sm">Output</span>
             <div className="h-[80vh] w-[50vw] font-serif text-white text-xs bg-[#0c121d] overflow-auto p-1">{output}</div>
         </div>
         </div>
+        <div className="text-white">{currUsersElements}</div>
     </div>
     )
 }

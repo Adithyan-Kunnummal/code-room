@@ -1,13 +1,24 @@
 import { useState } from 'react'
 import { Link } from "react-router";
 import { useNavigate } from "react-router";
+import { UserAuth } from '../context/AuthContext'
 
 export default function Home() {
     const [roomId, setRoomId] = useState('')
-     let navigate = useNavigate();
+    
+    let navigate = useNavigate();
+
+    const { session, user, handleLogin, handleLogout, loading } = UserAuth()
 
     return (
-        <form 
+        <div>
+            <form>
+                <button onClick={(e) => {
+                    e.preventDefault()
+                    handleLogin()}}>Sign in with google</button>
+
+            </form>
+            <form 
             onSubmit={(e) => {
                 e.preventDefault()
                 navigate(`/editor/${roomId}`);
@@ -27,6 +38,8 @@ export default function Home() {
                 Join Room
             </Link>
         </form>
+        </div>
+        
             
     )
 }
