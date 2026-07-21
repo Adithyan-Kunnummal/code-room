@@ -16,8 +16,10 @@ import axios from 'axios'
 import {UserAuth} from '../context/AuthContext'
 
 export default function Editor() {
+    // Ref to div that editor should atttach to
     const editorRef = useRef<HTMLDivElement>(null)
-    const editorView = useRef<EditorView | null>(null)
+    // Reference to editorView so that component survives re-renders
+    const editorView = useRef<EditorView | null>(null) 
 
     const { roomId } =  useParams()
 
@@ -25,9 +27,7 @@ export default function Editor() {
     const [output, setOutput] = useState('')
     const [users, setUsers] = useState<string[]>([])
 
-    const { session, user, handleLogin, handleLogout, loading } = UserAuth()
-
-    console.log(user)
+    const { session, user, handleLogin, handleLogout } = UserAuth()
 
     const usercolors = [
     { color: '#30bced', light: '#30bced33' },
@@ -42,8 +42,9 @@ export default function Editor() {
 
     const userColor = usercolors[random.uint32() % usercolors.length]
 
+    // Setup Yjs doc and Codemirror editor
     useEffect(() => {
-        if(editorRef.current == null || roomId == null) return
+        if(editorRef.current == null || roomId == null || session == null) return
 
         const ydoc = new Y.Doc()
         const provider = new WebrtcProvider(roomId, ydoc)
@@ -57,7 +58,7 @@ export default function Editor() {
         colorLight: userColor.light
     })
 
-
+    // State stores information about the editor
     const state = EditorState.create({
       doc: ytext.toString(),
       extensions: [
@@ -68,6 +69,7 @@ export default function Editor() {
       ]
     })
 
+    // Editor UI
     const view = new EditorView({ state, parent: editorRef.current})
     editorView.current = view
 
@@ -78,18 +80,18 @@ export default function Editor() {
         setUsers(currUsers)
     }
 
+    // Update list of users when user joins or leaves
     updateUsers()
     provider.awareness.on('change', () => updateUsers())
 
     return () => {
-      view.destroy()
-      provider.destroy();
-      ydoc.destroy();
+        view.destroy()
+        provider.destroy();
+        ydoc.destroy();
     };
-    }, [roomId])
+    }, [roomId, session])
 
-    const currUsersElements = users.map((user) => (<li key = {user}>{user}</li>))
-
+    // Run code with piston
     async function handleExecute() {
         const data = {
         "language": "javascript",
@@ -138,7 +140,7 @@ export default function Editor() {
                     <p className="text-sm text-[#8A9B8C]">
                         Signed in as
                     </p>
-
+                    
                     <p className="font-semibold">
                         {user?.user_metadata.name}
                     </p>
@@ -227,7 +229,7 @@ export default function Editor() {
         </div>
 
 
-        <section className="flex-1 flex flex-col">
+        <section className="bg-[#30312F] flex-1 flex flex-col">
 
             <div className="
                 h-10
@@ -244,7 +246,6 @@ export default function Editor() {
                 </span>
 
             </div>
-
             <div
                 ref={editorRef}
                 className="

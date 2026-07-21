@@ -14,8 +14,6 @@ export default function Home() {
         setUsername(user?.user_metadata.name)
     }, [session, user]) 
 
-    console.log(user?.user_metadata)
-
     const joinRoom = () => {
         console.log(roomId.trim())
         if (!roomId.trim()) return;
@@ -73,10 +71,17 @@ export default function Home() {
                         <p className="text-sm text-[#8A9B8C]">
                             Current user
                         </p>
-
+                        
+                        {loading ?
+                        <div className = 'h-[20px]'>
+                            <img className = 'w-12 object-cover h-[100%]' src = './spinner.svg'/> 
+                        </div>
+                        :
                         <p className="font-semibold">
                             {username}
                         </p>
+                        }
+                        
                     </div>
                     {!user?.is_anonymous }
 
@@ -115,8 +120,6 @@ export default function Home() {
                 </div>
 
 
-
-                {/* Room Input */}
                 <div className="space-y-4">
 
 

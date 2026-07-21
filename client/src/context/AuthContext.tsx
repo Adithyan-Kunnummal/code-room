@@ -1,9 +1,7 @@
 import { createContext, useEffect, useState, useContext } from 'react'
 import type { ReactNode } from 'react'
 import type { Session, User  } from '@supabase/supabase-js'
-import {supabase} from '../lib/supabase'
-
-import getAnonUsername from '../utils/anonUsername'
+import { supabase } from '../lib/supabase'
 
 type AuthContextType = {
     session: Session | null;
@@ -21,9 +19,14 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined)
  
 export const AuthContextProvider = ({ children }: AuthContextProviderProps) => {
     const [session, setSession] = useState<Session | null>(null)
-    const [loading, setLoading] = useState(false)
+    const [loading, setLoading] = useState(true)
+
+    function getAnonName() {
+        return "Anonymous" + Math.floor(Math.random() * 1000)
+    }
     
-    // Check if session already exists on first load
+    // Check & set session if session already exists on first load.
+    // Else, sign in anonymously
     useEffect(() => {
         const checkSession = async () => {
             const {data: {session}} = await supabase.auth.getSession()
@@ -34,7 +37,7 @@ export const AuthContextProvider = ({ children }: AuthContextProviderProps) => {
                 if(session?.user.is_anonymous && !session?.user.user_metadata.name) {
                     await supabase.auth.updateUser({
                         data: {
-                            name: getAnonUsername()
+                            name: getAnonName()
                         }
                     })
                 }
@@ -49,7 +52,7 @@ export const AuthContextProvider = ({ children }: AuthContextProviderProps) => {
 
                 const result = await supabase.auth.updateUser({
                     data: {
-                        name: getAnonUsername()
+                        name: getAnonName()
                     }
                 })
                 console.log(result)
@@ -59,7 +62,6 @@ export const AuthContextProvider = ({ children }: AuthContextProviderProps) => {
         }
 
         checkSession()
-    
 
         const {
             data: { subscription },
@@ -67,9 +69,12 @@ export const AuthContextProvider = ({ children }: AuthContextProviderProps) => {
             setSession(session);
         });
 
+        setLoading(false)
+
         return () => subscription.unsubscribe();
     }, []);
 
+    // LOGIN
     const handleLogin = async () => {
         setLoading(true);
 
@@ -87,6 +92,7 @@ export const AuthContextProvider = ({ children }: AuthContextProviderProps) => {
         setLoading(false);
     };
 
+    // LOGOUT
     const handleLogout = async () => {
         setLoading(true)
         const { error } = await supabase.auth.signOut()
@@ -106,7 +112,7 @@ export const AuthContextProvider = ({ children }: AuthContextProviderProps) => {
 
         await supabase.auth.updateUser({
             data: {
-                name: getAnonUsername()
+                name: getAnonName()
             }
         })
         setLoading(false)
