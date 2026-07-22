@@ -9,7 +9,7 @@ function App() {
     <AuthContextProvider>
       <Routes>
       <Route path = '/' element = {<Home/>}/>
-      <Route path = '/editor/:roomId' element = {<Editor/>}/>
+      <Route path = '/room/:roomId' element = {<Editor/>}/>
     </Routes>
     </AuthContextProvider>
     

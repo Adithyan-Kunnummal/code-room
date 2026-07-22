@@ -14,20 +14,26 @@ import {useParams} from 'react-router-dom'
 import axios from 'axios'
 
 import {UserAuth} from '../context/AuthContext'
+import {supabase} from "../lib/supabase"
 
 export default function Editor() {
     // Ref to div that editor should atttach to
     const editorRef = useRef<HTMLDivElement>(null)
     // Reference to editorView so that component survives re-renders
     const editorView = useRef<EditorView | null>(null) 
+    // Create webrtc provider once
+    const providerRef = useRef<WebrtcProvider | null>(null);
+    // To get access to text in editor for saving to db
+    const yTextRef = useRef<Y.Text | null>(null)
 
     const { roomId } =  useParams()
 
     const [isRunning, setIsRunning] = useState(false)
+    const [isSaving, setIsSaving] = useState(false)
     const [output, setOutput] = useState('')
     const [users, setUsers] = useState<string[]>([])
 
-    const { session, user, handleLogin, handleLogout } = UserAuth()
+    const { user, handleLogin, handleLogout } = UserAuth()
 
     const usercolors = [
     { color: '#30bced', light: '#30bced33' },
@@ -44,7 +50,7 @@ export default function Editor() {
 
     // Setup Yjs doc and Codemirror editor
     useEffect(() => {
-        if(editorRef.current == null || roomId == null || session == null) return
+        if(!editorRef.current || !roomId) return
 
         const ydoc = new Y.Doc()
         const provider = new WebrtcProvider(roomId, ydoc)
@@ -52,44 +58,51 @@ export default function Editor() {
 
         const undoManager = new Y.UndoManager(ytext)
 
-        provider.awareness.setLocalStateField('user', {
-        name: user?.user_metadata.name,
-        color: userColor.color,
-        colorLight: userColor.light
-    })
+        providerRef.current = provider
+        yTextRef.current = ytext
 
-    // State stores information about the editor
-    const state = EditorState.create({
-      doc: ytext.toString(),
-      extensions: [
-        basicSetup,
-        javascript(),
-        oneDark,
-        yCollab(ytext, provider.awareness, { undoManager })
-      ]
-    })
+        // State stores information about the editor
+        const state = EditorState.create({
+        doc: ytext.toString(),
+        extensions: [
+            basicSetup,
+            javascript(),
+            oneDark,
+            yCollab(ytext, provider.awareness, { undoManager })
+        ]
+        })
 
-    // Editor UI
-    const view = new EditorView({ state, parent: editorRef.current})
-    editorView.current = view
+        // Editor UI
+        const view = new EditorView({ state, parent: editorRef.current})
+        editorView.current = view
 
-    function updateUsers() {
-        const currUsers = Array.from(provider.awareness.getStates().values())
-        .filter((state) => state.user)
-        .map(state => state.user.name)
-        setUsers(currUsers)
-    }
+        function updateUsers() {
+            const currUsers = Array.from(provider.awareness.getStates().values())
+            .filter((state) => state.user)
+            .map(state => state.user.name)
+            setUsers(currUsers)
+        }
 
-    // Update list of users when user joins or leaves
-    updateUsers()
-    provider.awareness.on('change', () => updateUsers())
+        // Update list of users when user joins or leaves
+        updateUsers()
+        provider.awareness.on('change', () => updateUsers())
 
-    return () => {
-        view.destroy()
-        provider.destroy();
-        ydoc.destroy();
-    };
-    }, [roomId, session])
+        return () => {
+            view.destroy()
+            provider.destroy();
+            ydoc.destroy();
+        };
+    }, [roomId])
+
+    useEffect(() => {
+        if (!providerRef.current || !user) return
+
+        providerRef.current.awareness.setLocalStateField("user", {
+            name: user.user_metadata.name,
+            color: userColor.color,
+            colorLight: userColor.light,
+        })
+    }, [user])
 
     // Run code with piston
     async function handleExecute() {
@@ -116,6 +129,21 @@ export default function Editor() {
         finally {
             setIsRunning(false)
         }
+    }
+
+    // Save to database
+    async function handleSave() {
+        setIsSaving(true)
+        console.log(user?.id)
+
+        const { error } = await supabase
+            .from("rooms")
+            .update({ file_content: yTextRef.current?.toString() })
+            .eq("room_id", roomId)
+
+        setIsSaving(false)
+
+        if(error) console.log(error)
     }
 
     return (
@@ -179,6 +207,20 @@ export default function Editor() {
                     </button>}
                 </div>
             </div>
+            
+            <button
+                onClick={handleSave}
+                className="
+                    bg-[#40513B]
+                    px-5
+                    py-2
+                    rounded-lg
+                    hover:bg-[#4f6348]
+                    disabled:opacity-50
+                "
+            >
+                {!isSaving ? "Save" : "Saving..."}
+            </button>
 
             <button
                 onClick={handleExecute}
@@ -202,29 +244,11 @@ export default function Editor() {
     <main className="flex flex-1 overflow-hidden">
 
         <div className="
-            w-64
-            border-r
-            border-[#40513B]
+            w-10
             bg-[#30312F]
             flex
             flex-col
         ">
-
-            <div className="p-2 border-b border-[#40513B]">
-
-                <h2 className="font-semibold">
-                    Files
-                </h2>
-
-            </div>
-
-            <div className="flex-1 overflow-auto p-2">
-
-                <button className="w-full text-left p-3 rounded-lg hover:bg-[#40513B]">
-                    main.js
-                </button>
-
-            </div>
 
         </div>
 
@@ -235,6 +259,7 @@ export default function Editor() {
                 h-10
                 px-4
                 border-b
+                border-l
                 border-[#40513B]
                 flex
                 items-center
@@ -246,13 +271,16 @@ export default function Editor() {
                 </span>
 
             </div>
+
             <div
-                ref={editorRef}
-                className="
-                    flex-1
-                    overflow-auto
-                "
-            />
+            ref={editorRef}
+            className="
+                flex-1
+                overflow-auto
+                border-l
+                border-[#40513B]
+            ">
+            </div>
 
         </section>
 
@@ -307,7 +335,12 @@ export default function Editor() {
 
         <div className="flex gap-2 flex-wrap">
 
-            {users.map((u) => (
+            {!users ? 
+            <div className = 'h-[100%]]'>
+                <img className = 'w-12 object-cover h-[100%]' src = '../spinner.svg'/> 
+            </div>
+            :
+            users.map((u) => (
                 <span
                     key={u}
                     className="
@@ -320,7 +353,8 @@ export default function Editor() {
                 >
                     {u}
                 </span>
-            ))}
+            ))
+            }
 
         </div>
 

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from "react-router";
 import { UserAuth } from '../context/AuthContext'
+import {supabase} from "../lib/supabase"
 
 export default function Home() {
     const [roomId, setRoomId] = useState('')
@@ -8,23 +9,35 @@ export default function Home() {
     
     let navigate = useNavigate();
 
-    const { session, user, handleLogin, handleLogout, loading } = UserAuth()
+    const { session, user, handleLogin, handleLogout } = UserAuth()
 
     useEffect(() => {
         setUsername(user?.user_metadata.name)
     }, [session, user]) 
 
-    const joinRoom = () => {
-        console.log(roomId.trim())
+    async function joinRoom() {
         if (!roomId.trim()) return;
 
-        navigate(`/editor/${roomId}`);
+        navigate(`/room/${roomId}`);
     };
 
-    const createRoom = () => {
+    async function createRoom() {
         const id = crypto.randomUUID()
+            const { error } = await supabase
+                .from('rooms')
+                .insert({
+                room_id: id,
+                file_name: "main.js",
+                file_content: 'console.log("Hello, World!")',
+                file_language: "javascript"
+            })
 
-        navigate(`/editor/${id}`)
+            if(error) {
+                console.log(error)
+                return  
+            }
+
+            navigate(`/room/${id}`)
     }
 
     return (
@@ -72,7 +85,7 @@ export default function Home() {
                             Current user
                         </p>
                         
-                        {loading ?
+                        {!username ?
                         <div className = 'h-[20px]'>
                             <img className = 'w-12 object-cover h-[100%]' src = './spinner.svg'/> 
                         </div>
