@@ -15,6 +15,7 @@ import axios from 'axios'
 
 import {UserAuth} from '../context/AuthContext'
 import {supabase} from "../lib/supabase"
+import {useNavigate} from 'react-router-dom'
 
 export default function Editor() {
     // Ref to div that editor should atttach to
@@ -33,7 +34,9 @@ export default function Editor() {
     const [output, setOutput] = useState('')
     const [users, setUsers] = useState<string[]>([])
 
-    const { user, handleLogin, handleLogout } = UserAuth()
+    const { user } = UserAuth()
+
+    const navigate = useNavigate()
 
     const usercolors = [
     { color: '#30bced', light: '#30bced33' },
@@ -152,7 +155,7 @@ export default function Editor() {
     <header className="h-16 px-6 border-b border-[#40513B] bg-[#30312F] flex items-center justify-between">
 
         <div>
-            <h1 className="text-xl font-bold">
+            <h1 onClick={() => {navigate('/')}} className="text-xl font-bold">
                 CodeRoom
             </h1>
 
@@ -172,39 +175,6 @@ export default function Editor() {
                     <p className="font-semibold">
                         {user?.user_metadata.name}
                     </p>
-                </div>
-                <div>
-                    {user?.is_anonymous ? <button
-                        onClick={handleLogin}
-                        className="
-                            bg-white
-                            text-[#30312F]
-                            px-4
-                            py-2
-                            rounded-lg
-                            font-medium
-                            hover:opacity-90
-                            transition
-                        "
-                    >
-                        Signin with Google
-                    </button> 
-                    : 
-                    <button
-                        onClick={handleLogout}
-                        className="
-                            bg-white
-                            text-[#30312F]
-                            px-4
-                            py-2
-                            rounded-lg
-                            font-medium
-                            hover:opacity-90
-                            transition
-                        "
-                    >
-                        Signout
-                    </button>}
                 </div>
             </div>
             
