@@ -56,7 +56,11 @@ export default function Editor() {
         if(!editorRef.current || !roomId) return
 
         const ydoc = new Y.Doc()
-        const provider = new WebrtcProvider(roomId, ydoc)
+        const provider = new WebrtcProvider(roomId, ydoc, {
+            signaling: [
+                "ws://localhost:4444"
+            ]
+        })
         const ytext = ydoc.getText('codemirror')
 
         const undoManager = new Y.UndoManager(ytext)
@@ -84,11 +88,46 @@ export default function Editor() {
             .filter((state) => state.user)
             .map(state => state.user.name)
             setUsers(currUsers)
+            return currUsers
         }
 
         // Update list of users when user joins or leaves
         updateUsers()
-        provider.awareness.on('change', () => updateUsers())
+
+        provider.awareness.on('change', async () => {
+            const currUsers = updateUsers()
+            if(currUsers.length === 0) {
+               handleSave()
+            }
+        })
+
+        // Load from db if no content exists in ydoc
+        async function loadInitialContent() {
+            const fileContent = yTextRef.current?.toString()
+
+            if(!fileContent) {
+                const { data, error } = await supabase
+                    .from('rooms')
+                    .select('file_content')
+                    .eq('room_id', roomId)
+                    .single()
+
+                if(error) {
+                    console.log(error)
+                }
+                yTextRef.current?.insert(0, data?.file_content)
+            }
+        }
+        
+        // Only runs when 2 users are synced
+        provider.on('synced', () => {
+            loadInitialContent()
+        })
+
+        // For first user. Wait before fetching since it takes time to setup ydoc
+        setTimeout(() => {
+            loadInitialContent();
+        }, 2000);
 
         return () => {
             view.destroy()
@@ -137,7 +176,6 @@ export default function Editor() {
     // Save to database
     async function handleSave() {
         setIsSaving(true)
-        console.log(user?.id)
 
         const { error } = await supabase
             .from("rooms")

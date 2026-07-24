@@ -2,12 +2,10 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from "react-router";
 import { UserAuth } from '../context/AuthContext'
 import {supabase} from "../lib/supabase"
-import axios from 'axios';
 
 export default function Home() {
     const [roomId, setRoomId] = useState('')
     const [username, setUsername] = useState("Anonymous")
-    const [errorMessage, setErrorMessage] = useState("");
     
     let navigate = useNavigate();
 
@@ -20,53 +18,32 @@ export default function Home() {
     async function joinRoom() {
         if (!roomId.trim()) return;
 
-        try{
-            const response  = await axios.post(`http://localhost:3000/rooms/${roomId}/join`,
-                {},
-                {
-                    headers: {
-                        authorization: `Bearer ${session?.access_token}`
-                    }
+            const {data, error} = await supabase
+                .rpc('join_room', {
+                    input_room_id: roomId
+                })
+                
+                if(error) {
+                    console.log("ERROR: ", error.message)
+                    return
                 }
-            )
-
-            console.log(response.data)
+                if(!data) {
+                    console.log("No room found with ID: ", roomId)
+                    return
+                }
 
             navigate(`/room/${roomId.trim()}`);
-        } catch(error) {
-            if(axios.isAxiosError(error)) {
-                if(error.response?.status == 404) {
-                    const message = `No room found with ID: ${roomId}`
-
-                    setErrorMessage(message)
-                    console.log(message)
-                }
-                else {
-                    console.log(error)
-                }
-            }
-        }
-        
-
     };
 
     async function createRoom() {
-        const id = crypto.randomUUID()
-            const { error } = await supabase
-                .from('rooms')
-                .insert({
-                room_id: id,
-                file_name: "main.js",
-                file_content: 'console.log("Hello, World!")',
-                file_language: "javascript"
-            })
+        const {data: id, error} = await supabase.rpc('create_room')
 
-            if(error) {
-                console.log(error)
-                return  
-            }
+        if(error) {
+            console.log(error)
+            return  
+        }
 
-            navigate(`/room/${id}`)
+        navigate(`/room/${id}`)
     }
 
     return (
