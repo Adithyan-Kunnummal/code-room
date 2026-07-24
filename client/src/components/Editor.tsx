@@ -16,6 +16,7 @@ import axios from 'axios'
 import {UserAuth} from '../context/AuthContext'
 import {supabase} from "../lib/supabase"
 import {useNavigate} from 'react-router-dom'
+import {startTimer, stopTimer} from '../utils/timer'
 
 export default function Editor() {
     // Ref to div that editor should atttach to
@@ -34,7 +35,8 @@ export default function Editor() {
     const [output, setOutput] = useState('')
     const [users, setUsers] = useState<string[]>([])
 
-    const { user } = UserAuth()
+    const { user, loading, setLoading } = UserAuth()
+    console.log(loading)
 
     const navigate = useNavigate()
 
@@ -92,10 +94,9 @@ export default function Editor() {
         }
 
         // Update list of users when user joins or leaves
-        updateUsers()
-
         provider.awareness.on('change', async () => {
             const currUsers = updateUsers()
+            // Save to db when all users have left
             if(currUsers.length === 0) {
                handleSave()
             }
@@ -124,15 +125,26 @@ export default function Editor() {
             loadInitialContent()
         })
 
+        setLoading(true)
         // For first user. Wait before fetching since it takes time to setup ydoc
         setTimeout(() => {
-            loadInitialContent();
-        }, 2000);
+            loadInitialContent()
+            setLoading(false)
+        }, 2000)
+
+        // Save doc every 10 seconds of inactivity
+        function observer() {
+            stopTimer()
+            startTimer(10000, handleSave)
+        }
+        ytext.observe(observer)
 
         return () => {
             view.destroy()
-            provider.destroy();
-            ydoc.destroy();
+            provider.destroy()
+            ydoc.destroy()
+            ytext.unobserve(observer)
+            stopTimer()
         };
     }, [roomId])
 

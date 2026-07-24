@@ -8,6 +8,7 @@ type AuthContextType = {
     user: User | null;
     handleLogin: () => Promise<void>;
     handleLogout: () => Promise<void>;
+    setLoading: Function;
     loading: boolean;
 };
 
@@ -125,6 +126,7 @@ export const AuthContextProvider = ({ children }: AuthContextProviderProps) => {
             user: session?.user ?? null,
             handleLogin,
             handleLogout,
+            setLoading,
             loading,
         }}
         >
