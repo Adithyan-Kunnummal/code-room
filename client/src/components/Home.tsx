@@ -5,17 +5,19 @@ import {supabase} from "../lib/supabase"
 
 export default function Home() {
     const [roomId, setRoomId] = useState('')
-    const [username, setUsername] = useState("Anonymous")
+    const [username, setUsername] = useState("")
+    const [prevRooms, setPrevRooms] = useState<string[]>([])
     
     let navigate = useNavigate();
 
-    const { session, user, handleLogin, handleLogout } = UserAuth()
+    const { user, handleLogin, handleLogout } = UserAuth()
 
     useEffect(() => {
+        if (!user) return
         setUsername(user?.user_metadata.name)
-    }, [session, user]) 
+    }, [user])
 
-    async function joinRoom() {
+    async function joinRoom(roomId: string) {
         if (!roomId.trim()) return;
 
             const {data, error} = await supabase
@@ -45,6 +47,30 @@ export default function Home() {
 
         navigate(`/room/${id}`)
     }
+
+    async function fetchPrevRooms() {
+        const { data, error } = await supabase
+            .from('rooms')
+            .select('room_id')
+        
+        if(error) {
+            console.log(error)
+            return
+        }
+            
+        return data
+    }
+
+    useEffect(() => {
+        if(!user) return 
+
+        async function loadRooms() {
+            const rooms = await fetchPrevRooms()
+            if(rooms) setPrevRooms(rooms.map((obj) => {return obj.room_id}))
+        }
+
+        loadRooms()
+    }, [user])
 
     return (
          <div className="min-h-screen bg-[#2E392F] text-white flex items-center justify-center">
@@ -102,7 +128,6 @@ export default function Home() {
                         }
                         
                     </div>
-                    {!user?.is_anonymous }
 
                     {user?.is_anonymous ? <button
                         onClick={handleLogin}
@@ -162,7 +187,7 @@ export default function Home() {
 
 
                     <button
-                        onClick={joinRoom}
+                        onClick={() => joinRoom(roomId)}
                         className="
                             w-full
                             bg-[#40513B]
@@ -177,13 +202,50 @@ export default function Home() {
                     </button>
 
 
+                    {prevRooms.length > 0 &&
+                    (
+                    <div className="flex flex-col gap-3">
+                        <div className="
+                        flex
+                        items-center
+                        gap-3
+                        text-[#8A9B8C]
+                        ">
+                            <div className="h-px bg-[#40513B] flex-1"/> 
+                            OR
+                            <div className="h-px bg-[#40513B] flex-1"/>
+                        </div>
+
+                        <select onChange={(e) => joinRoom(e.target.value)} defaultValue='selectHeading' className="
+                        w-full
+                        appearance-none
+                        bg-[#40513B]
+                        px-4
+                        py-3
+                        rounded-xl
+                        cursor-pointer
+                        outline-none
+                        transition-all
+                        hover:bg-[#4A5E43]
+                        text-center
+                        font-semibold
+                        ">
+                            <option value='selectHeading' disabled={true} className="">Join Previous Room</option>
+                            {prevRooms.map((roomId) => (
+                                <option value={roomId} key={roomId}>{roomId}</option>)
+                            )}
+                        </select>
+                    </div>
+                    )
+                    }
+
                     <div className="
                         flex
                         items-center
                         gap-3
                         text-[#8A9B8C]
                     ">
-                        <div className="h-px bg-[#40513B] flex-1"/>
+                        <div className="h-px bg-[#40513B] flex-1"/> 
                         OR
                         <div className="h-px bg-[#40513B] flex-1"/>
                     </div>

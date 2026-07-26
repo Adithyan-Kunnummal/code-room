@@ -187,6 +187,7 @@ export default function Editor() {
 
     // Save to database
     async function handleSave() {
+        if(!yTextRef.current?.toString()) return
         setIsSaving(true)
 
         const { error } = await supabase
