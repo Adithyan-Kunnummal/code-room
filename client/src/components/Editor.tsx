@@ -18,6 +18,13 @@ import {supabase} from "../lib/supabase"
 import {useNavigate} from 'react-router-dom'
 import {startTimer, stopTimer} from '../utils/timer'
 
+import {
+    Copy,
+    CopyCheck,
+    Pencil,
+    X
+} from 'lucide-react'
+
 export default function Editor() {
     // Ref to div that editor should atttach to
     const editorRef = useRef<HTMLDivElement>(null)
@@ -33,10 +40,12 @@ export default function Editor() {
     const [isRunning, setIsRunning] = useState(false)
     const [isSaving, setIsSaving] = useState(false)
     const [output, setOutput] = useState('')
+    const [isIdCopied, setIsIdCopied] = useState(false)
+    const [showRenameModal, setShowRenameModal] = useState(false)
+    const [fileName, setFileName] = useState('')
     const [users, setUsers] = useState<string[]>([])
 
-    const { user, loading, setLoading } = UserAuth()
-    console.log(loading)
+    const { user, setLoading } = UserAuth()
 
     const navigate = useNavigate()
 
@@ -106,6 +115,17 @@ export default function Editor() {
         async function loadInitialContent() {
             const fileContent = yTextRef.current?.toString()
 
+            const { data, error } = await supabase
+                .from('rooms')
+                .select('file_name')
+                .eq('room_id', roomId)
+                .single()
+            
+            if(error) {
+                console.log(error)
+            }
+            setFileName(data?.file_name)
+
             if(!fileContent) {
                 const { data, error } = await supabase
                     .from('rooms')
@@ -118,6 +138,8 @@ export default function Editor() {
                 }
                 yTextRef.current?.insert(0, data?.file_content)
             }
+
+            
         }
         
         // Only runs when 2 users are synced
@@ -148,6 +170,7 @@ export default function Editor() {
         };
     }, [roomId])
 
+    // Setting names and cursor color for users
     useEffect(() => {
         if (!providerRef.current || !user) return
 
@@ -200,19 +223,55 @@ export default function Editor() {
         if(error) console.log(error)
     }
 
+    // Copy room ID to clipboard
+    async function handleCopyId() {
+        try {
+            await navigator.clipboard.writeText(roomId ?? "")
+            setIsIdCopied(true)
+            setTimeout(() => {
+                setIsIdCopied(false)
+            }, 1000)
+        } catch (error) {
+            console.error("Failed to copy room ID.", error)
+        }
+    }
+
+    // Rename room file
+    async function handleRenameFile() {
+        if(!fileName) return
+
+        const { error } = await supabase
+            .from('rooms')
+            .update({ file_name: fileName })
+            .eq('room_id', roomId)
+
+        if(error) console.log(error);
+        setShowRenameModal(false)
+    }
+
     return (
     <div className="min-h-screen bg-[#40513B] text-white flex flex-col">
 
-    <header className="h-16 px-6 border-b border-[#40513B] bg-[#30312F] flex items-center justify-between">
+    <header className="h-20 px-6 border-b border-[#40513B] bg-[#30312F] flex items-center justify-between">
 
         <div>
             <h1 onClick={() => {navigate('/')}} className="text-xl font-bold">
                 CodeRoom
             </h1>
 
-            <p className="text-sm text-[#8A9B8C]">
-                Room ID: {roomId}
-            </p>
+            <div className="flex gap-2 items-center text-sm">
+                <p className="text-sm text-[#8A9B8C]">
+                    Room ID: {roomId}
+                </p>
+                <button 
+                className="hover:cursor-pointer"
+                onClick = {handleCopyId}
+                >
+                    
+                    {isIdCopied ? <CopyCheck size={18}/> : <Copy size={18} color="#8A9B8C"/>}
+                </button>
+            </div>
+            
         </div>
 
         <div className="flex items-center gap-4">
@@ -286,10 +345,17 @@ export default function Editor() {
                 items-center
                 bg-[#30312F]
             ">
-
-                <span className="text-[#8A9B8C]">
-                    main.js
-                </span>
+                <div className="flex gap-2 items-center">
+                    <span className="text-[#8A9B8C]">
+                        {fileName}
+                    </span>
+                    <button
+                    onClick = {() => {setShowRenameModal(true)}}
+                    className="hover:cursor-pointer">
+                        <Pencil size={18} color="#8A9B8C"/>
+                    </button>
+                </div>
+                
 
             </div>
 
@@ -341,6 +407,41 @@ export default function Editor() {
 
         </div>
 
+        {showRenameModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+            <div className="w-full max-w-md rounded-xl bg-[#30312F] shadow-xl">
+                <div className="relative border-b border-gray-700 p-4">
+                    <h2 className="text-center text-lg">
+                        Rename File
+                    </h2>
+
+                    <button
+                        onClick={()=> {setShowRenameModal(false)}}
+                        className="absolute right-4 top-1/2 -translate-y-1/2 rounded p-1 hover:bg-[#40513B] transition"
+                    >
+                        <X size={22} />
+                    </button>
+                </div>
+
+                <div className="flex flex-col gap-4 p-4">
+                    <input
+                        type="text"
+                        className="w-full rounded bg-[#2E392F] px-4 py-3 outline-none focus:ring-1 focus:ring-[#8A9B8C]"
+                        value={fileName}
+                        onChange={(e) => setFileName(e.target.value)}
+                    />
+
+                    <div className="flex justify-end gap-2">
+                        <button
+                        onClick={handleRenameFile}
+                        className="rounded bg-[#40513B] px-4 py-2 hover:bg-[#526848]">
+                            Save
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>)
+        }
     </main>
 
     <footer className="
