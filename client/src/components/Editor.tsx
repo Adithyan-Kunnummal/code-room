@@ -22,7 +22,10 @@ import {
     Copy,
     CopyCheck,
     Pencil,
-    X
+    X,
+    Download,
+    Save,
+    Play
 } from 'lucide-react'
 
 export default function Editor() {
@@ -43,6 +46,7 @@ export default function Editor() {
     const [isIdCopied, setIsIdCopied] = useState(false)
     const [showRenameModal, setShowRenameModal] = useState(false)
     const [fileName, setFileName] = useState('')
+    const [newFileName, setNewFileName] = useState('')
     const [users, setUsers] = useState<string[]>([])
 
     const { user, setLoading } = UserAuth()
@@ -125,6 +129,7 @@ export default function Editor() {
                 console.log(error)
             }
             setFileName(data?.file_name)
+            setNewFileName(data?.file_name)
 
             if(!fileContent) {
                 const { data, error } = await supabase
@@ -238,15 +243,33 @@ export default function Editor() {
 
     // Rename room file
     async function handleRenameFile() {
-        if(!fileName) return
+        if(!newFileName) return
 
         const { error } = await supabase
             .from('rooms')
-            .update({ file_name: fileName })
+            .update({ file_name: newFileName })
             .eq('room_id', roomId)
 
-        if(error) console.log(error);
+        if(error) console.log(error)
+        else setFileName(newFileName)
+
         setShowRenameModal(false)
+    }
+
+    // Download file
+    async function handleDownloadFile() {
+        const data = yTextRef.current?.toString()
+        if(!data) return
+
+        const blob = new Blob([data], {type: 'text/plain'})
+        const url = URL.createObjectURL(blob)
+        const link = document.createElement('a')
+
+        link.href = url
+        link.download = fileName
+        link.click()
+        
+        URL.revokeObjectURL(url)
     }
 
     return (
@@ -287,18 +310,40 @@ export default function Editor() {
                     </p>
                 </div>
             </div>
+
+            <button
+                onClick={handleDownloadFile}
+                className="
+                    flex
+                    gap-2
+                    items-center
+                    fustify-center
+                    bg-[#40513B]
+                    px-3
+                    py-2
+                    rounded-lg
+                    hover:bg-[#4f6348]
+                "
+            >
+                <Download size={18}/>
+                {"Download"}
+            </button>
             
             <button
                 onClick={handleSave}
                 className="
+                    flex
+                    gap-1
+                    items-center
+                    justify-center
                     bg-[#40513B]
-                    px-5
+                    px-3
                     py-2
                     rounded-lg
                     hover:bg-[#4f6348]
-                    disabled:opacity-50
                 "
             >
+                <Save size={18}/>
                 {!isSaving ? "Save" : "Saving..."}
             </button>
 
@@ -306,14 +351,19 @@ export default function Editor() {
                 onClick={handleExecute}
                 disabled={isRunning}
                 className="
+                    flex
+                    gap-1
+                    items-center
+                    justify-center
                     bg-[#40513B]
-                    px-5
+                    px-3
                     py-2
                     rounded-lg
                     hover:bg-[#4f6348]
                     disabled:opacity-50
                 "
             >
+                <Play size={18}/>
                 {isRunning ? "Running..." : "Run"}
             </button>
 
@@ -347,7 +397,7 @@ export default function Editor() {
             ">
                 <div className="flex gap-2 items-center">
                     <span className="text-[#8A9B8C]">
-                        {fileName}
+                        {fileName + ".js"}
                     </span>
                     <button
                     onClick = {() => {setShowRenameModal(true)}}
@@ -427,8 +477,8 @@ export default function Editor() {
                     <input
                         type="text"
                         className="w-full rounded bg-[#2E392F] px-4 py-3 outline-none focus:ring-1 focus:ring-[#8A9B8C]"
-                        value={fileName}
-                        onChange={(e) => setFileName(e.target.value)}
+                        value={newFileName}
+                        onChange={(e) => setNewFileName(e.target.value)}
                     />
 
                     <div className="flex justify-end gap-2">
