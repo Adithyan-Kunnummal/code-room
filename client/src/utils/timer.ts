@@ -1,10 +1,11 @@
-let timer: ReturnType<typeof setTimeout>;
+let timer: ReturnType<typeof setTimeout>
 
-function startTimer(t: number, f: Function) {
-    timer = setTimeout(f, t)
+function startTimer(delayMs: number, callback: () => void) {
+    timer = setTimeout(callback, delayMs)
 }
+
 function stopTimer() {
     clearTimeout(timer)
 }
 
-export {startTimer, stopTimer}
+export { startTimer, stopTimer }
