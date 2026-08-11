@@ -18,6 +18,7 @@ import { supabase } from '../../lib/supabase'
 import { startTimer, stopTimer } from '../../utils/timer'
 
 import EditorHeader from './EditorHeader'
+import Chat from '../chat/ChatPage'
 import EditorFooter from './EditorFooter'
 
 import {
@@ -65,7 +66,7 @@ export default function Editor() {
     const [newFileName, setNewFileName] = useState('')
     const [users, setUsers] = useState<string[]>([])
 
-    const { user, setLoading } = UserAuth()
+    const { user } = UserAuth()
 
     // Picking the color once per mount
     const userColor = useMemo(
@@ -339,17 +340,31 @@ export default function Editor() {
 
                 </section>
 
-                <div className="w-[350px] border-l border-[#40513B] bg-[#30312F] flex flex-col">
 
-                    <div className="h-10 border-b border-[#40513B] flex items-center px-4">
-                        Output
+                <div className="flex flex-col w-[350px]">
+                    <div className="w-full h-1/2 border-l border-[#40513B] bg-[#30312F] flex flex-col">
+                        <div className="h-10 border-b border-[#40513B] flex items-center px-4">
+                            Output
+                        </div>
+
+                        <div className="flex-1 overflow-auto p-4 text-sm font-mono whitespace-pre-wrap">
+                            {output}
+                        </div>
                     </div>
+                    
+                    <div className="w-full h-1/2 border-l border-t border-[#40513B] bg-[#30312F] flex flex-col">
+                        <div className="h-10 border-b border-[#40513B] flex items-center px-4">
+                            Chat
+                        </div>
 
-                    <div className="flex-1 overflow-auto p-4 text-sm font-mono whitespace-pre-wrap">
-                        {output}
+                        <div className="flex-1 overflow-auto p-4 text-sm font-mono whitespace-pre-wrap">
+                            <Chat roomID={roomId? roomId : ""}/>
+                        </div>
                     </div>
-
                 </div>
+
+
+                
 
                 {showRenameModal && (
                     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
