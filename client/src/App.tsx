@@ -2,7 +2,7 @@ import { Routes, Route } from "react-router";
 import { AuthContextProvider } from './context/AuthContext'
 
 import Home from './components/Home'
-import Editor from './components/Editor'
+import Editor from './components/editor/Editor'
 
 function App() {
   return (

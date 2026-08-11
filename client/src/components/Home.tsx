@@ -10,12 +10,13 @@ export default function Home() {
     
     let navigate = useNavigate();
 
-    const { user, handleLogin, handleLogout } = UserAuth()
+    const { session, user, handleLogin, handleLogout } = UserAuth()
 
     useEffect(() => {
-        if (!user) return
-        setUsername(user?.user_metadata.name)
-    }, [user])
+        if (!session?.user) return
+        setUsername(session.user?.user_metadata.name)
+        console.log(session.user)
+    }, [session])
 
     async function joinRoom(roomId: string) {
         if (!roomId.trim()) return;

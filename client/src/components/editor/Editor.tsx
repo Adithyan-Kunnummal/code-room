@@ -13,19 +13,16 @@ import {useState, useRef, useEffect} from 'react'
 import {useParams} from 'react-router-dom'
 import axios from 'axios'
 
-import {UserAuth} from '../context/AuthContext'
-import {supabase} from "../lib/supabase"
-import {useNavigate} from 'react-router-dom'
-import {startTimer, stopTimer} from '../utils/timer'
+import {UserAuth} from '../../context/AuthContext'
+import {supabase} from "../../lib/supabase"
+import {startTimer, stopTimer} from '../../utils/timer'
+
+import EditorHeader from './EditorHeader'
+import EditorFooter from './EditorFooter'
 
 import {
-    Copy,
-    CopyCheck,
     Pencil,
     X,
-    Download,
-    Save,
-    Play
 } from 'lucide-react'
 
 export default function Editor() {
@@ -33,12 +30,14 @@ export default function Editor() {
     const editorRef = useRef<HTMLDivElement>(null)
     // Reference to editorView so that component survives re-renders
     const editorView = useRef<EditorView | null>(null) 
+    // Refernce to ydoc so that it survives re-renders
+    const yDocRef =  useRef<Y.Doc | null>(null)
     // Create webrtc provider once
     const providerRef = useRef<WebrtcProvider | null>(null);
     // To get access to text in editor for saving to db
     const yTextRef = useRef<Y.Text | null>(null)
 
-    const { roomId } =  useParams()
+    const { roomId } = useParams()
 
     const [isRunning, setIsRunning] = useState(false)
     const [isSaving, setIsSaving] = useState(false)
@@ -50,8 +49,6 @@ export default function Editor() {
     const [users, setUsers] = useState<string[]>([])
 
     const { user, setLoading } = UserAuth()
-
-    const navigate = useNavigate()
 
     const usercolors = [
     { color: '#30bced', light: '#30bced33' },
@@ -67,9 +64,7 @@ export default function Editor() {
     const userColor = usercolors[random.uint32() % usercolors.length]
 
     // Setup Yjs doc and Codemirror editor
-    useEffect(() => {
-        if(!editorRef.current || !roomId) return
-
+    function setupEditor(roomId: string, parent: HTMLDivElement) {
         const ydoc = new Y.Doc()
         const provider = new WebrtcProvider(roomId, ydoc, {
             signaling: [
@@ -80,6 +75,7 @@ export default function Editor() {
 
         const undoManager = new Y.UndoManager(ytext)
 
+        yDocRef.current = ydoc
         providerRef.current = provider
         yTextRef.current = ytext
 
@@ -95,62 +91,74 @@ export default function Editor() {
         })
 
         // Editor UI
-        const view = new EditorView({ state, parent: editorRef.current})
+        const view = new EditorView({ state, parent: parent})
         editorView.current = view
 
-        function updateUsers() {
-            const currUsers = Array.from(provider.awareness.getStates().values())
-            .filter((state) => state.user)
-            .map(state => state.user.name)
-            setUsers(currUsers)
-            return currUsers
+        return {
+            ydoc,
+            provider,
+            ytext,
+            view
         }
+    }
 
-        // Update list of users when user joins or leaves
-        provider.awareness.on('change', async () => {
-            const currUsers = updateUsers()
-            // Save to db when all users have left
-            if(currUsers.length === 0) {
-               handleSave()
-            }
-        })
+    // Load from db if no content exists in ydoc
+    async function loadInitialContent() {
+        const fileContent = yTextRef.current?.toString()
 
-        // Load from db if no content exists in ydoc
-        async function loadInitialContent() {
-            const fileContent = yTextRef.current?.toString()
+        const { data, error } = await supabase
+            .from('rooms')
+            .select('file_name')
+            .eq('room_id', roomId)
+            .single()
+        
+        if(error) {
+            console.log(error)
+        }
+        setFileName(data?.file_name)
+        setNewFileName(data?.file_name)
 
+        if(!fileContent) {
             const { data, error } = await supabase
                 .from('rooms')
-                .select('file_name')
+                .select('file_content')
                 .eq('room_id', roomId)
                 .single()
-            
+
             if(error) {
                 console.log(error)
             }
-            setFileName(data?.file_name)
-            setNewFileName(data?.file_name)
-
-            if(!fileContent) {
-                const { data, error } = await supabase
-                    .from('rooms')
-                    .select('file_content')
-                    .eq('room_id', roomId)
-                    .single()
-
-                if(error) {
-                    console.log(error)
-                }
-                yTextRef.current?.insert(0, data?.file_content)
-            }
-
-            
+            yTextRef.current?.insert(0, data?.file_content)
         }
+    }
+
+    // Update list of users
+    function updateUsers(provider: WebrtcProvider) {
+        const currUsers = Array.from(provider.awareness.getStates().values())
+        .filter((state) => state.user)
+        .map(state => state.user.name)
+        setUsers(currUsers)
+        return currUsers
+    }
+
+    // Save doc every 10 seconds of inactivity
+    function autoSaveObserver() {
+        stopTimer()
+        startTimer(10000, handleSave)
+    }
+
+    useEffect(() => {
+        if(!editorRef.current || !roomId) return
+
+        const { ydoc, provider, ytext, view } = setupEditor(roomId, editorRef.current)
+
+        // Update list of users when user joins or leaves
+        provider.awareness.on('change',
+            () => updateUsers(provider))
         
         // Only runs when 2 users are synced
-        provider.on('synced', () => {
-            loadInitialContent()
-        })
+        provider.on('synced',
+            () => loadInitialContent())
 
         setLoading(true)
         // For first user. Wait before fetching since it takes time to setup ydoc
@@ -159,18 +167,13 @@ export default function Editor() {
             setLoading(false)
         }, 2000)
 
-        // Save doc every 10 seconds of inactivity
-        function observer() {
-            stopTimer()
-            startTimer(10000, handleSave)
-        }
-        ytext.observe(observer)
+        ytext.observe(autoSaveObserver)
 
         return () => {
             view.destroy()
             provider.destroy()
             ydoc.destroy()
-            ytext.unobserve(observer)
+            ytext.unobserve(autoSaveObserver)
             stopTimer()
         };
     }, [roomId])
@@ -275,101 +278,15 @@ export default function Editor() {
     return (
     <div className="min-h-screen bg-[#40513B] text-white flex flex-col">
 
-    <header className="h-20 px-6 border-b border-[#40513B] bg-[#30312F] flex items-center justify-between">
-
-        <div>
-            <h1 onClick={() => {navigate('/')}} className="text-xl font-bold">
-                CodeRoom
-            </h1>
-
-            <div className="flex gap-2 items-center text-sm">
-                <p className="text-sm text-[#8A9B8C]">
-                    Room ID: {roomId}
-                </p>
-                <button 
-                className="hover:cursor-pointer"
-                onClick = {handleCopyId}
-                >
-                    
-                    {isIdCopied ? <CopyCheck size={18}/> : <Copy size={18} color="#8A9B8C"/>}
-                </button>
-            </div>
-            
-        </div>
-
-        <div className="flex items-center gap-4">
-
-            <div className="flex gap-2">
-                <div className = "text-right">
-                    <p className="text-sm text-[#8A9B8C]">
-                        Signed in as
-                    </p>
-                    
-                    <p className="font-semibold">
-                        {user?.user_metadata.name}
-                    </p>
-                </div>
-            </div>
-
-            <button
-                onClick={handleDownloadFile}
-                className="
-                    flex
-                    gap-2
-                    items-center
-                    fustify-center
-                    bg-[#40513B]
-                    px-3
-                    py-2
-                    rounded-lg
-                    hover:bg-[#4f6348]
-                "
-            >
-                <Download size={18}/>
-                {"Download"}
-            </button>
-            
-            <button
-                onClick={handleSave}
-                className="
-                    flex
-                    gap-1
-                    items-center
-                    justify-center
-                    bg-[#40513B]
-                    px-3
-                    py-2
-                    rounded-lg
-                    hover:bg-[#4f6348]
-                "
-            >
-                <Save size={18}/>
-                {!isSaving ? "Save" : "Saving..."}
-            </button>
-
-            <button
-                onClick={handleExecute}
-                disabled={isRunning}
-                className="
-                    flex
-                    gap-1
-                    items-center
-                    justify-center
-                    bg-[#40513B]
-                    px-3
-                    py-2
-                    rounded-lg
-                    hover:bg-[#4f6348]
-                    disabled:opacity-50
-                "
-            >
-                <Play size={18}/>
-                {isRunning ? "Running..." : "Run"}
-            </button>
-
-        </div>
-
-    </header>
+    <EditorHeader 
+        roomId={roomId}
+        handleCopyId={handleCopyId}
+        handleDownloadFile={handleDownloadFile}
+        handleSave={handleSave}
+        handleExecute={handleExecute}
+        isIdCopied={isIdCopied}
+        isSaving={isSaving}
+        isRunning={isRunning}/>
 
     <main className="flex flex-1 overflow-hidden">
 
@@ -494,48 +411,8 @@ export default function Editor() {
         }
     </main>
 
-    <footer className="
-        h-14
-        border-t
-        border-[#40513B]
-        bg-[#30312F]
-        px-6
-        flex
-        items-center
-        justify-between
-    ">
-
-        <div className="flex gap-2 flex-wrap">
-
-            {!users ? 
-            <div className = 'h-[100%]]'>
-                <img className = 'w-12 object-cover h-[100%]' src = '../spinner.svg'/> 
-            </div>
-            :
-            users.map((u) => (
-                <span
-                    key={u}
-                    className="
-                        px-3
-                        py-1
-                        rounded-full
-                        bg-[#40513B]
-                        text-sm
-                    "
-                >
-                    {u}
-                </span>
-            ))
-            }
-
-        </div>
-
-        <span className="text-[#8A9B8C] text-sm">
-            {users.length} online
-        </span>
-
-    </footer>
-
+        <EditorFooter users={users} />
+    
 </div>
     )
 }
