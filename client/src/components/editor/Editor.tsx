@@ -25,15 +25,10 @@ import {
     X,
 } from 'lucide-react'
 
-// Signaling server is environment-specific (local dev vs. production), so it
-// should never be hardcoded. Falls back to the public y-webrtc signaling
-// server if no env var is set.
 const SIGNALING_SERVERS = import.meta.env.VITE_SIGNALING_SERVER
     ? [import.meta.env.VITE_SIGNALING_SERVER]
     : ["wss://signaling.yjs.dev"]
 
-// Defined once at module scope instead of inside the component so the array
-// isn't recreated on every render.
 const USER_COLORS = [
     { color: '#30bced', light: '#30bced33' },
     { color: '#6eeb83', light: '#6eeb8333' },
@@ -165,6 +160,7 @@ export default function Editor() {
         startTimer(10000, handleSave)
     }
 
+    // Setup the Yjs doc and Codemirror editor when joining room
     useEffect(() => {
         if (!editorRef.current || !roomId) return
 
@@ -173,18 +169,6 @@ export default function Editor() {
 
         // Update list of users when user joins or leaves
         provider.awareness.on('change', () => updateUsers(provider))
-
-        // Only fires once synced with at least one other peer
-        provider.on('synced', () => loadInitialContent())
-
-        setLoading(true)
-        // Fallback for the case where `synced` never fires (e.g. first user
-        // in the room, no peers to sync with). loadInitialContent() is
-        // idempotent, so this won't double-load if `synced` also fires.
-        setTimeout(() => {
-            loadInitialContent()
-            setLoading(false)
-        }, 2000)
 
         ytext.observe(autoSaveObserver)
 
@@ -207,6 +191,33 @@ export default function Editor() {
             colorLight: userColor.light,
         })
     }, [user, userColor])
+
+    // Supabase presence to detect whether there are no other members 
+    // in the room and loadInitialContent needs to be called
+    useEffect(() => {
+        if (!roomId || !user) return
+
+        const channel = supabase.channel(`presence:${roomId}`, {
+            config: { presence: { key: user.id } }
+        })
+
+        channel
+            .on('presence', { event: 'sync' }, () => {
+                const state = channel.presenceState()
+                const memberCount = Object.keys(state).length
+
+                if (memberCount === 1) {
+                    loadInitialContent()
+                }
+            })
+            .subscribe(async (status) => {
+                if (status === 'SUBSCRIBED') {
+                    await channel.track({ joined_at: Date.now() })
+                }
+            })
+
+        return () => { channel.unsubscribe() }
+    }, [roomId, user])
 
     // Run code with piston
     async function handleExecute() {
